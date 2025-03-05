@@ -1,0 +1,34 @@
+---
+title: "MT"
+author: "Andrea Moya"
+date: "2025-03-05"
+output: html_document
+---
+
+`
+```{r}
+install.packages("pacman")
+library("pacman")
+
+p_load("readr", 
+       "dplyr",
+       "ggplot2")
+```
+
+```{r}
+Vector_r <- c("Border Colie", "Schnauzer", "Gran Danes", "Chihuahua", "Criollo")
+Vector_t <- c(3, 9, 3, 4, 5)
+Vector_e <- c(4, 3.5, 3, 7, 4.5)
+Raza_Perros <- data.frame(Raza=Vector_r,
+                     Totalperros=Vector_t,
+                     EdadPromedio = Vector_e)
+Raza_Perros
+```
+
+
+```{r}
+prom_total <- mean(Raza_Perros$Totalperros)
+prom_edad <- mean(Raza_Perros$EdadPromedio)
+
+
+```
