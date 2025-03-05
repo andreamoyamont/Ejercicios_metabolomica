@@ -1,0 +1,176 @@
+---
+title: "MT2"
+author: "Andrea Moya"
+date: "2025-03-05"
+output: html_document
+---
+# Evaluación Medio Término
+# Creado por:Andrea Moya 
+
+
+```{r}
+install.packages("pacman", dependencies=TRUE)
+library("pacman")
+p_load("vroom",
+       "ggplot2",
+       "ggrepel",
+       "dplyr",
+       "matrixTests")
+```
+```{r}
+Volcano_data <- vroom(file="https://raw.githubusercontent.com/ManuelLaraMVZ/Examen_R_transcriptomica/refs/heads/main/Datos_Genes_azar6.csv")
+Volcano_data
+```
+
+```{r}
+controles <- Volcano_data %>% 
+  filter(Type=="Selected Control") %>% 
+  select(-2)
+head(controles)
+
+Volcano_data2 <- Volcano_data %>% 
+  filter(Type=="Target") %>% 
+  select(-2)
+head(Volcano_data2)
+```
+```{r}
+#obtención de promedios
+promedioT1 <- mean(controles$T1)
+promedioT2 <- mean(controles$T2)
+promedioT3 <- mean(controles$T3)
+promedioC1 <- mean(controles$C1)
+promedioC2 <- mean(controles$C2)
+promedioC3 <- mean(controles$C3)
+
+```
+```{r}
+Volcano_data3 <- Volcano_data2 %>% 
+  mutate(DCT1=T1-promedioT1,
+         DCT2=T2-promedioT2,
+         DCT3=T3-promedioT3,
+         DCC1=C1-promedioC1,
+         DCC2=C2-promedioC2,
+         DCC3=C3-promedioC3) %>% 
+  select(-2,-3,-4,-5,-6,-7) %>% 
+  mutate(promedioDCT=(DCT1+DCT2+DCT3)/3,
+         promedioDCC=(DCC1+DCC2+DCC3)/3) %>% 
+  select(-2,-3,-4,-5,-6,-7) %>% 
+  mutate(dosDCT=2^-promedioDCT,
+         dosDCC=2^-promedioDCC,
+         dosDDCT=dosDCT/dosDCC,
+         FC=dosDDCT) %>% 
+  mutate(LogFC=log2(FC)) %>% 
+  select(1,4,5,7,8) 
+
+head(Volcano_data3)
+
+```
+
+```{r}
+Volcano_data4 <- Volcano_data2 %>% 
+  mutate(DCT1=T1-promedioT1,
+         DCT2=T2-promedioT2,
+         DCT3=T3-promedioT3,
+         DCC1=C1-promedioC1,
+         DCC2=C2-promedioC2,
+         DCC3=C3-promedioC3) %>% 
+  select(-2,-3,-4,-5,-6,-7)
+head(Volcano_data4)
+
+Tvalue <- row_t_welch(Volcano_data4[,c("DCC1","DCC2","DCC3")],
+                      Volcano_data4[,c("DCT1","DCT2","DCT3")])
+head(Tvalue)
+
+Valor_p <- Tvalue %>% 
+  select(pvalue)
+head(Valor_p)
+
+FC_y_PV <- Volcano_data3 %>% 
+  select(1,4) %>% 
+  mutate(PV = Valor_p$pvalue,
+         LFC= log2(FC),
+         LPV= -log10(PV))
+head(FC_y_PV)
+```
+```{r}
+#Selección de genes sobreexpresados y silenciados
+
+p_Value=-log10(0.05)
+FC_threshold=log2(2)
+
+down.regulated <- FC_y_PV %>% 
+  filter(LFC < -FC_threshold,
+         LPV > p_Value)
+head(down.regulated)
+
+up.regulated <- FC_y_PV %>% 
+  filter(LFC > FC_threshold,
+         LPV > p_Value)
+head(up.regulated)
+
+top.down <- down.regulated %>% 
+  arrange(PV) %>% 
+  head(5)
+head(top.down)
+
+
+top.up <- up.regulated %>% 
+  arrange(PV) %>% 
+  head(5)
+head(top.down)
+```
+```{r}
+Volcano <- ggplot(data = FC_y_PV,
+                  mapping = aes(x = LFC, y = LPV)) +
+  geom_point(alpha = 1.2, color = "#566573") +
+  theme_classic() +
+  labs(title = "Evaluación de cambio de la espresión",
+       caption = "Modificado por: __________") +
+  xlab(expression("Log"[2]~"(FC)")) +
+  ylab(expression("-Log"[10]~"(Valor de p)")) +  # Subíndice en "10"
+  geom_hline(yintercept = p_Value,
+             linetype = "dashed",
+             color = "#FFC300", 
+             size = 1) +
+  geom_vline(xintercept = FC_threshold,
+             linetype = "dashed", 
+             color = "#C70039", 
+             size = 1) +
+  geom_vline(xintercept = -FC_threshold,
+             linetype = "dashed", 
+             color = "#0b4eea", 
+             size = 1) +
+  geom_point(data = up.regulated,
+             x = up.regulated$LFC,
+             y = up.regulated$LPV,
+             alpha = 1, 
+             size = 2.5,
+             color = "#FF5733") +
+  geom_point(data = down.regulated,
+             x = down.regulated$LFC,
+             y = down.regulated$LPV,
+             alpha = 1, 
+             size = 2.5,
+             color = "#2f4578") +
+  geom_label_repel(data = top.down,
+                   mapping = aes(x = LFC, y = LPV, label = Gen),
+                   max.overlaps = 50,
+                   color = "black",
+                   fill = "#74da19") +
+  geom_label_repel(data = top.up,
+                   mapping = aes(x = LFC, y = LPV, label = Gen),
+                   max.overlaps = 50,
+                   color = "black",
+                   fill = "#f29611") +
+  theme(    axis.line = element_line(size = 1.2), 
+            axis.title.x = element_text(face = "bold"),  
+            axis.title.y = element_text(face = "bold"),  
+            axis.text.x = element_text(face = "bold"),  
+            axis.text.y = element_text(face = "bold")) +
+  scale_x_continuous(breaks = seq(min(-12), max(12), by =2)) +
+  scale_y_continuous(breaks = seq(0, max(3), by = 0.5))
+
+
+Volcano
+```
+
